@@ -2,7 +2,7 @@
 cmake_minimum_required(VERSION 3.5)
 
 # set the project name
-project(CitationFixer)
+project(AudioPlayer)
 
 ## C++ 17
 set(CMAKE_CXX_STANDARD 17)
@@ -18,5 +18,5 @@ add_compile_definitions(ASSET_DIR="${ASSET_DIR}")
 file(GLOB SRC_FILES "src/*.cpp")
 file(GLOB_RECURSE HDR_FILES "src/*.h")
 
-add_executable(CitationFixer ${SRC_FILES} ${HDR_FILES})
+add_executable(AudioPlayer ${SRC_FILES} ${HDR_FILES})
 
