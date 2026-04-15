@@ -1,20 +1,19 @@
 #include <iostream>
 #include <windows.h>
 
-#define MA_NO_DECODING
-#define MA_NO_ENCODING
 #define MINIAUDIO_IMPLEMENTATION
 #include "miniaudio.h"
 
-#define DEVICE_FORMAT       ma_format_f32
-#define DEVICE_CHANNELS     2
-#define DEVICE_SAMPLE_RATE  48000
+//#define DEVICE_FORMAT       ma_format_f32
+//#define DEVICE_CHANNELS     2
+//#define DEVICE_SAMPLE_RATE  48000
 
 bool simpleGate = false;
 
 std::string getAsset(std::string assetName) {
     return ASSET_DIR + std::string("/" + assetName);
 }
+std::string asset_path = getAsset("GETOUT.mp3");
 
 void isKeyPressed(int key, bool& buttonGate) {
     if (GetAsyncKeyState(key) < 0 && buttonGate == false)
@@ -35,56 +34,69 @@ void data_callback(ma_device* pDevice, void* pOutput, const void* pInput, ma_uin
     // In playback mode copy data to pOutput. In capture mode read data from pInput. In full-duplex mode, both
     // pOutput and pInput will be valid and you can move data from pInput into pOutput. Never process more than
     // frameCount frames.
+    ma_decoder* pDecoder = (ma_decoder*)pDevice->pUserData;
     if (simpleGate) {
-        ma_waveform* pSineWave;
+        if (pDecoder == NULL) {
+            return;
+        }
+        
+        /* Reading PCM frames will loop based on what we specified when called ma_data_source_set_looping(). */
+        ma_data_source_read_pcm_frames(pDecoder, pOutput, frameCount, NULL);
+        //ma_decoder_read_pcm_frames(pDecoder, pOutput, frameCount, NULL);
 
-        MA_ASSERT(pDevice->playback.channels == DEVICE_CHANNELS);
-
-        pSineWave = (ma_waveform*)pDevice->pUserData;
-        MA_ASSERT(pSineWave != NULL);
-
-        ma_waveform_read_pcm_frames(pSineWave, pOutput, frameCount, NULL);
-
-        (void)pInput;   /* Unused. */
+        (void)pInput;
+    }
+    else {
+        ma_decoder_seek_to_pcm_frame(pDecoder, 0);
     }
 }
 
 int main() {
-    std::cout << "Test: " << getAsset("Testings") << std::endl;
-
     bool exitable = false, buttonGate = false;
+    //std::string asset_path = getAsset("GETOUT.mp3");
+    std::cout << "Test path: " << asset_path << std::endl;
 
-    ma_waveform sineWave;
+    ma_result result;
+    ma_decoder decoder;
     ma_device_config deviceConfig;
     ma_device device;
-    ma_waveform_config sineWaveConfig;
+    //ma_waveform sineWave;
+    //ma_waveform_config sineWaveConfig;
+
+    result = ma_decoder_init_file(asset_path.c_str(), NULL, &decoder);
+    if (result != MA_SUCCESS) {
+        printf("Could not load file: %s\n", asset_path.c_str());
+        return -1;
+    }
+    ma_data_source_set_looping(&decoder, MA_TRUE);
 
     deviceConfig = ma_device_config_init(ma_device_type_playback);
-    deviceConfig.playback.format = DEVICE_FORMAT;
-    deviceConfig.playback.channels = DEVICE_CHANNELS;
-    deviceConfig.sampleRate = DEVICE_SAMPLE_RATE;
+    deviceConfig.playback.format = decoder.outputFormat;
+    deviceConfig.playback.channels = decoder.outputChannels;
+    deviceConfig.sampleRate = decoder.outputSampleRate;
     deviceConfig.dataCallback = data_callback;
-    deviceConfig.pUserData = &sineWave;
+    deviceConfig.pUserData = &decoder;
 
     if (ma_device_init(NULL, &deviceConfig, &device) != MA_SUCCESS) {
         printf("Failed to open playback device.\n");
-        return -4;
+        ma_decoder_uninit(&decoder);
+        return -2;
     }
-
-    printf("Device Name: %s\n", device.playback.name);
-
-    sineWaveConfig = ma_waveform_config_init(device.playback.format, device.playback.channels, device.sampleRate, ma_waveform_type_sine, 0.2, 220);
-    ma_waveform_init(&sineWaveConfig, &sineWave);
 
     if (ma_device_start(&device) != MA_SUCCESS) {
         printf("Failed to start playback device.\n");
         ma_device_uninit(&device);
-        return -5;
+        ma_decoder_uninit(&decoder);
+        return -3;
     }
+
+    printf("Device Name: %s\n", device.playback.name);
 
     while (!exitable) {
         isKeyPressed(VK_SHIFT, buttonGate);
     }
+
     ma_device_uninit(&device);
+    ma_decoder_uninit(&decoder);
     return 0;
 }
