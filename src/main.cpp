@@ -20,13 +20,14 @@ void isKeyPressed(int key, bool& buttonGate) {
     {
         std::cout << key << " key is down." << std::endl;
         buttonGate = true;
+        simpleGate = true;
     }
     if (GetAsyncKeyState(key) == 0 && buttonGate == true)
     {
         std::cout << key << " key is RELEASED!" << std::endl;
         buttonGate = false;
     }
-    simpleGate = buttonGate;
+    //simpleGate = buttonGate;
 }
 
 void data_callback(ma_device* pDevice, void* pOutput, const void* pInput, ma_uint32 frameCount)
@@ -34,6 +35,12 @@ void data_callback(ma_device* pDevice, void* pOutput, const void* pInput, ma_uin
     // In playback mode copy data to pOutput. In capture mode read data from pInput. In full-duplex mode, both
     // pOutput and pInput will be valid and you can move data from pInput into pOutput. Never process more than
     // frameCount frames.
+
+    /*
+    Useful stuff for the future:
+    ma_sound_at_end(ma_sound); // Can be used with ma_sound, but currently it's not being used nor have I researched it
+    */ 
+
     ma_decoder* pDecoder = (ma_decoder*)pDevice->pUserData;
     if (simpleGate) {
         if (pDecoder == NULL) {
@@ -41,8 +48,13 @@ void data_callback(ma_device* pDevice, void* pOutput, const void* pInput, ma_uin
         }
         
         /* Reading PCM frames will loop based on what we specified when called ma_data_source_set_looping(). */
-        ma_data_source_read_pcm_frames(pDecoder, pOutput, frameCount, NULL);
-        //ma_decoder_read_pcm_frames(pDecoder, pOutput, frameCount, NULL);
+        //ma_data_source_read_pcm_frames(pDecoder, pOutput, frameCount, NULL);
+        ma_uint64 readFrames = ma_decoder_read_pcm_frames(pDecoder, pOutput, frameCount, NULL);
+        
+        if (readFrames != 0) {
+            simpleGate = false;
+            std::cout << "Reached the end" << std::endl;
+        }
 
         (void)pInput;
     }
@@ -93,7 +105,7 @@ int main() {
     printf("Device Name: %s\n", device.playback.name);
 
     while (!exitable) {
-        isKeyPressed(VK_SHIFT, buttonGate);
+        isKeyPressed(0x51, buttonGate); // bound to the Q-key (virtual-key code 0x51)
     }
 
     ma_device_uninit(&device);
